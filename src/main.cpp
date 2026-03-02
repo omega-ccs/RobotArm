@@ -1,0 +1,166 @@
+#include <Arduino.h>
+#include <WiFi.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <ESPmDNS.h>
+#include <AsyncJson.h>
+#include <SPIFFS.h>
+
+#ifdef ESP32
+// Include the ESP32 servo library and use the right pins
+#include <ESP32Servo.h>
+// 17,18,21,38
+#define SERVO_PIN_ROTATION 17
+#define SERVO_PIN_SHOULDER 18
+#define SERVO_PIN_WRIST 21
+#define SERVO_PIN_CLAW 38
+#else
+// Otherwise include the regular Arduino servo library, use those pins
+#include <Servo.h>
+// 8,9,10,11
+#define SERVO_PIN_ROTATION 8
+#define SERVO_PIN_SHOULDER 9
+#define SERVO_PIN_WRIST 10
+#define SERVO_PIN_CLAW 11
+#endif
+
+// Servo objects for each axis
+Servo servo_rotation;
+Servo servo_shoulder;
+Servo servo_wrist;
+Servo servo_claw;
+
+// Intended position for each servo
+float servo_pos_rotation_target = 90;
+float servo_pos_shoulder_target = 90;
+float servo_pos_wrist_target = 90;
+float servo_pos_claw_target = 90;
+
+// "Actual" (filtered) position for each servo
+float servo_pos_rotation_actual = 90;
+float servo_pos_shoulder_actual = 90;
+float servo_pos_wrist_actual = 90;
+float servo_pos_claw_actual = 90;
+
+// Timestamp (milliseconds) of last output event
+uint last_action;
+
+// The webserver that handles all the network connections
+AsyncWebServer server(80);
+
+// Set up the WiFi connection
+void setup_wifi() {
+  int nwifi;
+  // Put the WiFi into client mode
+  WiFi.mode(WIFI_STA);
+  // Scan for WiFi networks, return total number available
+  nwifi = WiFi.scanNetworks();
+  // Loop through all available networks looking for one we know
+  for (int i=0; i<nwifi; i++) {
+    // If the school network is available, connect to it
+    if (WiFi.SSID(i) == "CCSdrama") {
+      Serial.print("Connecting to CCSdrama");
+      WiFi.begin("CCSdrama", "2025frozen");
+    // or if home network, use that
+    } else if (WiFi.SSID(i) == "omegacs.net") {
+      Serial.print("Connecting to omegacs.net");
+      WiFi.begin("omegacs.net", "b5a0897f7a");
+    }
+  }
+  // Wait for WiFi to connect
+  while (WiFi.status() != WL_CONNECTED) {
+    // Pause for half a second
+    delay(500);
+    Serial.print(".");
+  }
+  // Output the IP address acquired from the network
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+}
+
+void setup(void) {
+  // Set up the serial port for debugging
+  Serial.begin(115200);
+
+  // Set up the flash filesystem to serve webpages and JavaScript from
+  SPIFFS.begin();
+
+  // Start up the WiFi
+  setup_wifi();
+
+  // Advertise as "robotarm.local" to the network
+  MDNS.begin("robotarm");
+
+  // Set up default headers to resolve CORS access issues
+  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
+  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET, PUT");
+  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "*");
+
+  // Set up a handler for unknown files
+  server.onNotFound([](AsyncWebServerRequest *request) {
+    // If it's an OPTION request, answer it (with the headers above)
+    if (request->method() == HTTP_OPTIONS) {
+      request->send(200);
+    // Otherwise return a 404 Not Found
+    } else {
+      request->send(404,"Not found");
+    }
+  });
+
+  // Set up to serve static files from SPIFFS, with a default index.html
+  server.serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
+
+  // Listen for /servo for commands to the arm
+  server.on("/servo", HTTP_GET, [](AsyncWebServerRequest *request) {
+    String ratestr;
+    // Return a success "page"
+    request->send(200, "text/plain", "Set");
+    // If the incoming request has a "rotation" parameter
+    if (request->hasParam("rotation")) {
+      // Extract the string
+      ratestr = request->getParam("rotation")->value();
+      // Convert the string to an integer
+      servo_pos_rotation_target = ratestr.toInt();
+      // Output some debugging
+      Serial.print("New rotation: ");
+      Serial.println(servo_pos_rotation_target);
+    }
+    // Handle the "shoulder" parameter the same way
+    if (request->hasParam("shoulder")) {
+      ratestr = request->getParam("shoulder")->value();
+      servo_pos_shoulder_target = ratestr.toInt();
+      Serial.print("New shoulder: ");
+      Serial.println(servo_pos_shoulder_target);
+    }
+  });
+
+  // Set up the servo objects with the appropriate pins
+  servo_rotation.attach(SERVO_PIN_ROTATION);
+  servo_shoulder.attach(SERVO_PIN_SHOULDER);
+  servo_wrist.attach(SERVO_PIN_WRIST);
+  servo_claw.attach(SERVO_PIN_CLAW);
+
+  // Start the webserver
+  server.begin();
+
+  // Prime the action timer with the current time
+  last_action = millis();
+}
+
+#define AVERAGE 0.95
+
+void loop(void) {
+  // If 10 milliseconds has elapsed since the last action, do the action
+  if (millis() >= (last_action+10)) {  
+    // Calculate rolling average for the servo positions
+    servo_pos_rotation_actual = (servo_pos_rotation_actual * AVERAGE) + (servo_pos_rotation_target * (1-AVERAGE));
+    servo_pos_shoulder_actual = (servo_pos_shoulder_actual * AVERAGE) + (servo_pos_shoulder_target * (1-AVERAGE));
+
+    // Write the actual servo positions to the hardware
+    servo_rotation.write(servo_pos_rotation_actual);
+    servo_shoulder.write(servo_pos_shoulder_actual);
+
+    // Update the last action timer to the current time
+    last_action = millis();
+  }
+}
