@@ -3,8 +3,8 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <ESPmDNS.h>
-#include <AsyncJson.h>
-#include <SPIFFS.h>
+//#include <AsyncJson.h>
+#include <LittleFS.h>
 
 #ifdef ESP32
 // Include the ESP32 servo library and use the right pins
@@ -54,6 +54,7 @@ void setup_wifi() {
   // Put the WiFi into client mode
   WiFi.mode(WIFI_STA);
   // Scan for WiFi networks, return total number available
+  Serial.println("Scanning for networks...");
   nwifi = WiFi.scanNetworks();
   // Loop through all available networks looking for one we know
   for (int i=0; i<nwifi; i++) {
@@ -61,10 +62,12 @@ void setup_wifi() {
     if (WiFi.SSID(i) == "CCSdrama") {
       Serial.print("Connecting to CCSdrama");
       WiFi.begin("CCSdrama", "2025frozen");
+      break;
     // or if home network, use that
     } else if (WiFi.SSID(i) == "omegacs.net") {
       Serial.print("Connecting to omegacs.net");
       WiFi.begin("omegacs.net", "b5a0897f7a");
+      break;
     }
   }
   // Wait for WiFi to connect
@@ -74,6 +77,7 @@ void setup_wifi() {
     Serial.print(".");
   }
   // Output the IP address acquired from the network
+  Serial.println();
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
 }
@@ -82,33 +86,24 @@ void setup(void) {
   // Set up the serial port for debugging
   Serial.begin(115200);
 
-  // Set up the flash filesystem to serve webpages and JavaScript from
-  SPIFFS.begin();
-
   // Start up the WiFi
   setup_wifi();
 
   // Advertise as "robotarm.local" to the network
   MDNS.begin("robotarm");
 
+  // Set up the flash filesystem to serve webpages and JavaScript from
+  if (! LittleFS.begin(true)) {
+//    while (1) {
+//      Serial.println("Failed to start littlefs");
+//      delay(500);
+//    }
+  }
+
   // Set up default headers to resolve CORS access issues
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET, PUT");
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "*");
-
-  // Set up a handler for unknown files
-  server.onNotFound([](AsyncWebServerRequest *request) {
-    // If it's an OPTION request, answer it (with the headers above)
-    if (request->method() == HTTP_OPTIONS) {
-      request->send(200);
-    // Otherwise return a 404 Not Found
-    } else {
-      request->send(404,"Not found");
-    }
-  });
-
-  // Set up to serve static files from SPIFFS, with a default index.html
-  server.serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
 
   // Listen for /servo for commands to the arm
   server.on("/servo", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -131,6 +126,20 @@ void setup(void) {
       servo_pos_shoulder_target = ratestr.toInt();
       Serial.print("New shoulder: ");
       Serial.println(servo_pos_shoulder_target);
+    }
+  });
+  
+  // Set up to serve static files from SPIFFS, with a default index.html
+  server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
+
+  // Set up a handler for unknown files
+  server.onNotFound([](AsyncWebServerRequest *request) {
+    // If it's an OPTION request, answer it (with the headers above)
+    if (request->method() == HTTP_OPTIONS) {
+      request->send(200);
+    // Otherwise return a 404 Not Found
+    } else {
+      request->send(404,"Not found");
     }
   });
 
