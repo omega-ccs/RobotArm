@@ -44,6 +44,7 @@ float servo_pos_claw_actual = 90;
 
 // Timestamp (milliseconds) of last output event
 uint last_action;
+uint last_update;
 
 // The webserver that handles all the network connections
 AsyncWebServer server(80);
@@ -154,6 +155,8 @@ void setup(void) {
 
   // Prime the action timer with the current time
   last_action = millis();
+  last_update = millis();
+
 }
 
 #define AVERAGE 0.95
@@ -177,4 +180,6 @@ void loop(void) {
     // Update the last action timer to the current time
     last_action = millis();
   }
+
+
 }
