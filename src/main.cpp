@@ -117,20 +117,20 @@ void setup(void) {
       // Convert the string to an integer
       servo_pos_rotation_target = ratestr.toInt();
       // Output some debugging
-      Serial.print("New rotation: ");
-      Serial.println(servo_pos_rotation_target);
     }
     // Handle the "shoulder" parameter the same way
     if (request->hasParam("shoulder")) {
       ratestr = request->getParam("shoulder")->value();
       servo_pos_shoulder_target = ratestr.toInt();
-      Serial.print("New shoulder: ");
-      Serial.println(servo_pos_shoulder_target);
     }
+    Serial.print("New target rotation: ");
+    Serial.print(servo_pos_rotation_target);
+    Serial.print("  shoulder: ");
+    Serial.println(servo_pos_shoulder_target);
   });
   
   // Set up to serve static files from SPIFFS, with a default index.html
-  server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
+  //server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
 
   // Set up a handler for unknown files
   server.onNotFound([](AsyncWebServerRequest *request) {
@@ -160,10 +160,15 @@ void setup(void) {
 
 void loop(void) {
   // If 10 milliseconds has elapsed since the last action, do the action
-  if (millis() >= (last_action+10)) {  
+  if (millis() >= (last_action+10)) {
     // Calculate rolling average for the servo positions
     servo_pos_rotation_actual = (servo_pos_rotation_actual * AVERAGE) + (servo_pos_rotation_target * (1-AVERAGE));
     servo_pos_shoulder_actual = (servo_pos_shoulder_actual * AVERAGE) + (servo_pos_shoulder_target * (1-AVERAGE));
+    
+    Serial.print("New actual rotation: ");
+    Serial.print(servo_pos_rotation_actual);
+    Serial.print("  shoulder: ");
+    Serial.println(servo_pos_shoulder_actual);
 
     // Write the actual servo positions to the hardware
     servo_rotation.write(servo_pos_rotation_actual);

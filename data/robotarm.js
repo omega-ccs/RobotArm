@@ -5,9 +5,6 @@ var servo_pos_shoulder = 90;
 var canvas;
 var context;
 
-// List of gamepads
-var gamepads;
-
 function robotarm() {
     canvas = document.getElementById("canvas")
     context = canvas.getContext("2d")
@@ -19,7 +16,6 @@ function robotarm() {
 
     // Whenever a gamepad is "attached" (including at startup), grab them and output some details
     window.addEventListener("gamepadconnected", (event) => {
-        gamepads = navigator.getGamepads();
         console.log("Gamepad connected at index %d: %s. %d buttons, %d axes.",
                     event.gamepad.index, event.gamepad.id,
                     event.gamepad.buttons.length, event.gamepad.axes.length);
@@ -37,6 +33,7 @@ function draw() {
     context.clearRect(0,0,canvas.width,canvas.height)
 
     // Assuming there is a gamepad attached
+    gamepads = navigator.getGamepads();
     if (gamepads[0]) {
         // Grab the X and Y axes and adjust them to the servo range
         servo_pos_rotation = (gamepads[0].axes[0] * -90) + 90;
@@ -58,16 +55,20 @@ function draw() {
     // Either request the browser call this function ASAP
 //    window.requestAnimationFrame(draw);
     // or just use a timer to ensure it doesn't run too frequently
-    setTimeout(draw,50);
+    setTimeout(draw,100);
 }
 
 function keydown(event) {
     if (event.key == "ArrowLeft") {
+
     } else if (event.key == "ArrowRight") {
+
     }
 }
 
 function keyup(event) {
     if (event.key == "ArrowLeft" || event.key == "ArrowRight") {
+
     }
 }
+
