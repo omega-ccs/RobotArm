@@ -43,11 +43,12 @@ float servo_pos_wrist_actual = 90;
 float servo_pos_claw_actual = 90;
 
 // Timestamp (milliseconds) of last output event
-uint last_action;
-uint last_update;
+uint last_servo_update;
+uint last_mdns_update;
 
 // The webserver that handles all the network connections
 AsyncWebServer server(80);
+AsyncWebSocket ws("/ws");
 
 // Set up the WiFi connection
 void setup_wifi() {
@@ -81,6 +82,27 @@ void setup_wifi() {
   Serial.println();
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
+}
+
+void handle_websocket_data(void *arg, uint8_t *data, size_t len) {
+  Serial.printf("Got websocket: %.*s\n", len, data);
+}
+
+void on_websocket_event(AsyncWebSocket *server,
+                        AsyncWebSocketClient *client,
+                        AwsEventType type,
+                        void *arg, uint8_t *data, size_t len) {
+  switch (type) {
+    case WS_EVT_CONNECT:
+      Serial.printf("Websocket connect client #%u\n", client->id());
+      break;
+    case WS_EVT_DISCONNECT:
+      Serial.printf("Websocket disconnect client #%u\n", client->id());
+      break;
+    case WS_EVT_DATA:
+      handle_websocket_data(arg, data, len);
+      break;
+  }
 }
 
 void setup(void) {
@@ -144,6 +166,9 @@ void setup(void) {
     }
   });
 
+  ws.onEvent(on_websocket_event);
+  server.addHandler(&ws);
+
   // Set up the servo objects with the appropriate pins
   servo_rotation.attach(SERVO_PIN_ROTATION);
   servo_shoulder.attach(SERVO_PIN_SHOULDER);
@@ -154,8 +179,8 @@ void setup(void) {
   server.begin();
 
   // Prime the action timer with the current time
-  last_action = millis();
-  last_update = millis();
+  last_servo_update = millis();
+  last_mdns_update = millis();
 
 }
 
@@ -163,7 +188,7 @@ void setup(void) {
 
 void loop(void) {
   // If 10 milliseconds has elapsed since the last action, do the action
-  if (millis() >= (last_action+10)) {
+  if (millis() >= (last_servo_update + 10)) {
     // Calculate rolling average for the servo positions
     servo_pos_rotation_actual = (servo_pos_rotation_actual * AVERAGE) + (servo_pos_rotation_target * (1-AVERAGE));
     servo_pos_shoulder_actual = (servo_pos_shoulder_actual * AVERAGE) + (servo_pos_shoulder_target * (1-AVERAGE));
@@ -178,8 +203,11 @@ void loop(void) {
     servo_shoulder.write(servo_pos_shoulder_actual);
 
     // Update the last action timer to the current time
-    last_action = millis();
+    last_servo_update = millis();
   }
-
+  if (millis() >= (last_mdns_update + 5000)) {
+    // This doesn't actually seem to exist, so ....?
+    //MDNS.update()
+  }
 
 }
