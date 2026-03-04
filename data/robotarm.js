@@ -1,5 +1,7 @@
 var servo_pos_rotation = 90;
 var servo_pos_shoulder = 90;
+var gateway = `ws://robotarm.local/ws`;
+var websocket;
 
 // Canvas element and its 2d context
 var canvas;
@@ -20,7 +22,7 @@ function robotarm() {
                     event.gamepad.index, event.gamepad.id,
                     event.gamepad.buttons.length, event.gamepad.axes.length);
     }, false);
-
+    initWebSocket();
     // Run the main loop
     draw();
 }
@@ -36,8 +38,14 @@ function draw() {
     gamepads = navigator.getGamepads();
     if (gamepads[0]) {
         // Grab the X and Y axes and adjust them to the servo range
-        servo_pos_rotation = (gamepads[0].axes[0] * -90) + 90;
+        servo_pos_rotation = (gamepads[0].axes[0] * -90) + 90; 
         servo_pos_shoulder = (gamepads[0].axes[1] * -90) + 90;
+
+        //console.log(gamepads[0].buttons[0])
+        if (gamepads[0].buttons[0].pressed){
+            console.log('BUTTON')
+            websocket.send('You suck')
+        }
     }
 
     // Draw the servo positions to the screen
@@ -71,4 +79,10 @@ function keyup(event) {
 
     }
 }
+
+
+   function initWebSocket() {
+    console.log('Trying to open a WebSocket connection...');
+    websocket = new WebSocket(gateway);
+  }
 
