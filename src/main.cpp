@@ -3,7 +3,7 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <ESPmDNS.h>
-//#include <AsyncJson.h>
+#include <ArduinoJson.h>
 #include <LittleFS.h>
 
 #ifdef ESP32
@@ -51,7 +51,8 @@ AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
 // Set up the WiFi connection
-void setup_wifi() {
+void setup_wifi()
+{
   int nwifi;
   // Put the WiFi into client mode
   WiFi.mode(WIFI_STA);
@@ -59,21 +60,26 @@ void setup_wifi() {
   Serial.println("Scanning for networks...");
   nwifi = WiFi.scanNetworks();
   // Loop through all available networks looking for one we know
-  for (int i=0; i<nwifi; i++) {
+  for (int i = 0; i < nwifi; i++)
+  {
     // If the school network is available, connect to it
-    if (WiFi.SSID(i) == "CCSdrama") {
+    if (WiFi.SSID(i) == "CCSdrama")
+    {
       Serial.print("Connecting to CCSdrama");
       WiFi.begin("CCSdrama", "2025frozen");
       break;
-    // or if home network, use that
-    } else if (WiFi.SSID(i) == "omegacs.net") {
+      // or if home network, use that
+    }
+    else if (WiFi.SSID(i) == "omegacs.net")
+    {
       Serial.print("Connecting to omegacs.net");
       WiFi.begin("omegacs.net", "b5a0897f7a");
       break;
     }
   }
   // Wait for WiFi to connect
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED)
+  {
     // Pause for half a second
     delay(500);
     Serial.print(".");
@@ -84,28 +90,56 @@ void setup_wifi() {
   Serial.println(WiFi.localIP());
 }
 
-void handle_websocket_data(void *arg, uint8_t *data, size_t len) {
+void handle_websocket_data(void *arg, uint8_t *data, size_t len)
+{
   Serial.printf("Got websocket: %.*s\n", len, data);
+  AwsFrameInfo *info = (AwsFrameInfo *)arg;
+  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT)
+  {
+
+    const uint8_t size = JSON_OBJECT_SIZE(1);
+    StaticJsonDocument<size> json;
+    DeserializationError err = deserializeJson(json, data);
+    if (err)
+    {
+      Serial.print(F("deserializeJson() failed with code "));
+      Serial.println(err.c_str());
+      return;
+    }
+
+    const char *action = json["claw"];
+    if (strcmp(action, "closed") == 0)
+    {
+      servo_pos_claw_target = 180;
+    }
+    else
+    {
+      servo_pos_claw_target = 0;
+    }
+  }
 }
 
 void on_websocket_event(AsyncWebSocket *server,
                         AsyncWebSocketClient *client,
                         AwsEventType type,
-                        void *arg, uint8_t *data, size_t len) {
-  switch (type) {
-    case WS_EVT_CONNECT:
-      Serial.printf("Websocket connect client #%u\n", client->id());
-      break;
-    case WS_EVT_DISCONNECT:
-      Serial.printf("Websocket disconnect client #%u\n", client->id());
-      break;
-    case WS_EVT_DATA:
-      handle_websocket_data(arg, data, len);
-      break;
+                        void *arg, uint8_t *data, size_t len)
+{
+  switch (type)
+  {
+  case WS_EVT_CONNECT:
+    Serial.printf("Websocket connect client #%u\n", client->id());
+    break;
+  case WS_EVT_DISCONNECT:
+    Serial.printf("Websocket disconnect client #%u\n", client->id());
+    break;
+  case WS_EVT_DATA:
+    handle_websocket_data(arg, data, len);
+    break;
   }
 }
 
-void setup(void) {
+void setup(void)
+{
   // Set up the serial port for debugging
   Serial.begin(115200);
 
@@ -116,11 +150,12 @@ void setup(void) {
   MDNS.begin("robotarm");
 
   // Set up the flash filesystem to serve webpages and JavaScript from
-  if (! LittleFS.begin(true)) {
-//    while (1) {
-//      Serial.println("Failed to start littlefs");
-//      delay(500);
-//    }
+  if (!LittleFS.begin(true))
+  {
+    //    while (1) {
+    //      Serial.println("Failed to start littlefs");
+    //      delay(500);
+    //    }
   }
 
   // Set up default headers to resolve CORS access issues
@@ -129,42 +164,45 @@ void setup(void) {
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "*");
 
   // Listen for /servo for commands to the arm
-  server.on("/servo", HTTP_GET, [](AsyncWebServerRequest *request) {
-    String ratestr;
-    // Return a success "page"
-    request->send(200, "text/plain", "Set");
-    // If the incoming request has a "rotation" parameter
-    if (request->hasParam("rotation")) {
-      // Extract the string
-      ratestr = request->getParam("rotation")->value();
-      // Convert the string to an integer
-      servo_pos_rotation_target = ratestr.toInt();
-      // Output some debugging
-    }
-    // Handle the "shoulder" parameter the same way
-    if (request->hasParam("shoulder")) {
-      ratestr = request->getParam("shoulder")->value();
-      servo_pos_shoulder_target = ratestr.toInt();
-    }
-    //Serial.print("New target rotation: ");
-    //Serial.print(servo_pos_rotation_target);
-    //Serial.print("  shoulder: ");
-    //Serial.println(servo_pos_shoulder_target);
-  });
-  
+  server.on("/servo", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+              String ratestr;
+              // Return a success "page"
+              request->send(200, "text/plain", "Set");
+              // If the incoming request has a "rotation" parameter
+              if (request->hasParam("rotation"))
+              {
+                // Extract the string
+                ratestr = request->getParam("rotation")->value();
+                // Convert the string to an integer
+                servo_pos_rotation_target = ratestr.toInt();
+                // Output some debugging
+              }
+              // Handle the "shoulder" parameter the same way
+              if (request->hasParam("shoulder"))
+              {
+                ratestr = request->getParam("shoulder")->value();
+                servo_pos_shoulder_target = ratestr.toInt();
+              }
+              // Serial.print("New target rotation: ");
+              // Serial.print(servo_pos_rotation_target);
+              // Serial.print("  shoulder: ");
+              // Serial.println(servo_pos_shoulder_target);
+            });
+
   // Set up to serve static files from SPIFFS, with a default index.html
-  //server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
+  // server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
 
   // Set up a handler for unknown files
-  server.onNotFound([](AsyncWebServerRequest *request) {
+  server.onNotFound([](AsyncWebServerRequest *request)
+                    {
     // If it's an OPTION request, answer it (with the headers above)
     if (request->method() == HTTP_OPTIONS) {
       request->send(200);
     // Otherwise return a 404 Not Found
     } else {
       request->send(404,"Not found");
-    }
-  });
+    } });
 
   ws.onEvent(on_websocket_event);
   server.addHandler(&ws);
@@ -181,22 +219,23 @@ void setup(void) {
   // Prime the action timer with the current time
   last_servo_update = millis();
   last_mdns_update = millis();
-
 }
 
 #define AVERAGE 0.95
 
-void loop(void) {
+void loop(void)
+{
   // If 10 milliseconds has elapsed since the last action, do the action
-  if (millis() >= (last_servo_update + 10)) {
+  if (millis() >= (last_servo_update + 10))
+  {
     // Calculate rolling average for the servo positions
-    servo_pos_rotation_actual = (servo_pos_rotation_actual * AVERAGE) + (servo_pos_rotation_target * (1-AVERAGE));
-    servo_pos_shoulder_actual = (servo_pos_shoulder_actual * AVERAGE) + (servo_pos_shoulder_target * (1-AVERAGE));
-    
-    //Serial.print("New actual rotation: ");
-    //Serial.print(servo_pos_rotation_actual);
-    //Serial.print("  shoulder: ");
-    //Serial.println(servo_pos_shoulder_actual);
+    servo_pos_rotation_actual = (servo_pos_rotation_actual * AVERAGE) + (servo_pos_rotation_target * (1 - AVERAGE));
+    servo_pos_shoulder_actual = (servo_pos_shoulder_actual * AVERAGE) + (servo_pos_shoulder_target * (1 - AVERAGE));
+
+    // Serial.print("New actual rotation: ");
+    // Serial.print(servo_pos_rotation_actual);
+    // Serial.print("  shoulder: ");
+    // Serial.println(servo_pos_shoulder_actual);
 
     // Write the actual servo positions to the hardware
     servo_rotation.write(servo_pos_rotation_actual);
@@ -205,9 +244,9 @@ void loop(void) {
     // Update the last action timer to the current time
     last_servo_update = millis();
   }
-  if (millis() >= (last_mdns_update + 5000)) {
+  if (millis() >= (last_mdns_update + 5000))
+  {
     // This doesn't actually seem to exist, so ....?
-    //MDNS.update()
+    // MDNS.update()
   }
-
 }

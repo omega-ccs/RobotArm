@@ -50,7 +50,7 @@ function draw() {
         if (gamepads[0].id == "Saitek ST90 USB Stick (Vendor: 06a3 Product: 0422)")
             clawbutton = gamepads[0].buttons[0]
         else
-            clawbutton = gamepads[0].buttons[42]
+            clawbutton = gamepads[0].buttons[0]
 
         // Set claw servo to 67 if pressed, otherwise to 42
         servo_pos_claw = clawbutton.pressed ? 67 : 42
@@ -65,7 +65,7 @@ function draw() {
     var ws_message = {
         "rotation": servo_pos_rotation,
         "shoulder": servo_pos_shoulder,
-        "claw": servo_pos_claw
+        "claw": clawbutton.pressed ? "closed" : "open"
     }
     
     // only if the websocket is open and ready, send messages
