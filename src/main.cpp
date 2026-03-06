@@ -109,6 +109,14 @@ void handle_websocket_data(void *arg, uint8_t *data, size_t len) {
       servo_pos_rotation_target = json["rotation"];
       Serial.printf("ws new rotation is %f\n", servo_pos_rotation_target);
     }
+    if (json.containsKey("shoulder")) {
+      servo_pos_shoulder_target = json["shoulder"];
+      Serial.printf("ws new shoulder is %f\n", servo_pos_shoulder_target);
+    }
+    if (json.containsKey("claw")) {
+      servo_pos_claw_target = json["claw"];
+      Serial.printf("ws new claw is %f\n", servo_pos_claw_target);
+    }
   }
 }
 
@@ -224,6 +232,7 @@ void loop(void)
     // Calculate rolling average for the servo positions
     servo_pos_rotation_actual = (servo_pos_rotation_actual * AVERAGE) + (servo_pos_rotation_target * (1 - AVERAGE));
     servo_pos_shoulder_actual = (servo_pos_shoulder_actual * AVERAGE) + (servo_pos_shoulder_target * (1 - AVERAGE));
+    servo_pos_claw_actual = (servo_pos_claw_actual * AVERAGE) + (servo_pos_claw_target * (1 - AVERAGE));
 
     // Serial.print("New actual rotation: ");
     // Serial.print(servo_pos_rotation_actual);
@@ -233,6 +242,8 @@ void loop(void)
     // Write the actual servo positions to the hardware
     servo_rotation.write(servo_pos_rotation_actual);
     servo_shoulder.write(servo_pos_shoulder_actual);
+    servo_claw.write(servo_pos_claw_actual);
+    
 
     // Update the last action timer to the current time
     last_servo_update = millis();

@@ -54,7 +54,7 @@ function draw() {
             clawbutton = gamepads[0].buttons[0]
 
         
-        servo_pos_claw = clawbutton.pressed ? "closed" : "open"
+        servo_pos_claw = clawbutton.pressed ? 0 : 180
         
     }
 
