@@ -90,31 +90,24 @@ void setup_wifi()
   Serial.println(WiFi.localIP());
 }
 
-void handle_websocket_data(void *arg, uint8_t *data, size_t len)
-{
-  Serial.printf("Got websocket: %.*s\n", len, data);
-  AwsFrameInfo *info = (AwsFrameInfo *)arg;
-  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT)
-  {
 
-    const uint8_t size = JSON_OBJECT_SIZE(1);
-    StaticJsonDocument<size> json;
+void handle_websocket_data(void *arg, uint8_t *data, size_t len) {
+  //Serial.printf("Got websocket: %.*s\n", len, data);
+  AwsFrameInfo *info = (AwsFrameInfo *)arg;
+  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+  
+    //const uint8_t size = JSON_OBJECT_SIZE(1);
+    JsonDocument json;
     DeserializationError err = deserializeJson(json, data);
-    if (err)
-    {
+    if (err) {
       Serial.print(F("deserializeJson() failed with code "));
       Serial.println(err.c_str());
       return;
     }
 
-    const char *action = json["claw"];
-    if (strcmp(action, "closed") == 0)
-    {
-      servo_pos_claw_target = 180;
-    }
-    else
-    {
-      servo_pos_claw_target = 0;
+    if (json.containsKey("rotation")) {
+      servo_pos_rotation_target = json["rotation"];
+      Serial.printf("ws new rotation is %f\n", servo_pos_rotation_target);
     }
   }
 }

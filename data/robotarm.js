@@ -34,6 +34,7 @@ function robotarm() {
 var robotarm_hostname = "robotarm.local"
 //var robotarm_hostname = "10.0.128.97"
 
+
 function draw() {
     // Clear the canvas
     context.clearRect(0,0,canvas.width,canvas.height)
@@ -52,8 +53,9 @@ function draw() {
         else
             clawbutton = gamepads[0].buttons[0]
 
-        // Set claw servo to 67 if pressed, otherwise to 42
-        servo_pos_claw = clawbutton.pressed ? 67 : 42
+        
+        servo_pos_claw = clawbutton.pressed ? "closed" : "open"
+        
     }
 
     // Draw the servo positions to the screen
@@ -65,7 +67,7 @@ function draw() {
     var ws_message = {
         "rotation": servo_pos_rotation,
         "shoulder": servo_pos_shoulder,
-        "claw": clawbutton.pressed ? "closed" : "open"
+        "claw": servo_pos_claw,
     }
     
     // only if the websocket is open and ready, send messages
@@ -76,7 +78,7 @@ function draw() {
     }
     
     // use fetch/HTTP to send servo positions
-    fetch(`http://${robotarm_hostname}/servo?rotation=${servo_pos_rotation}&shoulder=${servo_pos_shoulder}`)
+    //fetch(`http://${robotarm_hostname}/servo?rotation=${servo_pos_rotation}&shoulder=${servo_pos_shoulder}`)
 
     // Either request the browser call this function ASAP
 //    window.requestAnimationFrame(draw);
