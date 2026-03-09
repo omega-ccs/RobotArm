@@ -99,10 +99,3 @@ function keyup(event) {
 
     }
 }
-
-
-   function initWebSocket() {
-    console.log('Trying to open a WebSocket connection...');
-    websocket = new WebSocket(gateway);
-  }
-

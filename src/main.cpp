@@ -9,19 +9,19 @@
 #ifdef ESP32
 // Include the ESP32 servo library and use the right pins
 #include <ESP32Servo.h>
-// 17,18,21,38
-#define SERVO_PIN_ROTATION 17
-#define SERVO_PIN_SHOULDER 18
-#define SERVO_PIN_WRIST 21
-#define SERVO_PIN_CLAW 38
+// 5,6,7,8
+#define SERVO_PIN_ROTATION 5
+#define SERVO_PIN_SHOULDER 6
+#define SERVO_PIN_WRIST 7
+#define SERVO_PIN_CLAW 8
 #else
 // Otherwise include the regular Arduino servo library, use those pins
 #include <Servo.h>
-// 8,9,10,11
-#define SERVO_PIN_ROTATION 8
-#define SERVO_PIN_SHOULDER 9
-#define SERVO_PIN_WRIST 10
-#define SERVO_PIN_CLAW 11
+// 2,3,4,5
+#define SERVO_PIN_ROTATION 2
+#define SERVO_PIN_SHOULDER 3
+#define SERVO_PIN_WRIST 4
+#define SERVO_PIN_CLAW 5
 #endif
 
 // Servo objects for each axis
@@ -107,15 +107,15 @@ void handle_websocket_data(void *arg, uint8_t *data, size_t len) {
 
     if (json.containsKey("rotation")) {
       servo_pos_rotation_target = json["rotation"];
-      Serial.printf("ws new rotation is %f\n", servo_pos_rotation_target);
+      //Serial.printf("ws new rotation is %f\n", servo_pos_rotation_target);
     }
     if (json.containsKey("shoulder")) {
       servo_pos_shoulder_target = json["shoulder"];
-      Serial.printf("ws new shoulder is %f\n", servo_pos_shoulder_target);
+      //Serial.printf("ws new shoulder is %f\n", servo_pos_shoulder_target);
     }
     if (json.containsKey("claw")) {
       servo_pos_claw_target = json["claw"];
-      Serial.printf("ws new claw is %f\n", servo_pos_claw_target);
+      Serial.printf("ws new claw is %0.1f\n", servo_pos_claw_target);
     }
   }
 }
@@ -143,6 +143,17 @@ void setup(void)
 {
   // Set up the serial port for debugging
   Serial.begin(115200);
+
+  ESP32PWM::allocateTimer(0);
+  ESP32PWM::allocateTimer(1);
+  ESP32PWM::allocateTimer(2);
+  ESP32PWM::allocateTimer(3);
+
+  // Set up the servo objects with the appropriate pins
+  servo_rotation.attach(SERVO_PIN_ROTATION);
+  servo_shoulder.attach(SERVO_PIN_SHOULDER);
+  servo_wrist.attach(SERVO_PIN_WRIST);
+  servo_claw.attach(SERVO_PIN_CLAW);
 
   // Start up the WiFi
   setup_wifi();
@@ -208,12 +219,6 @@ void setup(void)
   ws.onEvent(on_websocket_event);
   server.addHandler(&ws);
 
-  // Set up the servo objects with the appropriate pins
-  servo_rotation.attach(SERVO_PIN_ROTATION);
-  servo_shoulder.attach(SERVO_PIN_SHOULDER);
-  servo_wrist.attach(SERVO_PIN_WRIST);
-  servo_claw.attach(SERVO_PIN_CLAW);
-
   // Start the webserver
   server.begin();
 
@@ -232,6 +237,7 @@ void loop(void)
     // Calculate rolling average for the servo positions
     servo_pos_rotation_actual = (servo_pos_rotation_actual * AVERAGE) + (servo_pos_rotation_target * (1 - AVERAGE));
     servo_pos_shoulder_actual = (servo_pos_shoulder_actual * AVERAGE) + (servo_pos_shoulder_target * (1 - AVERAGE));
+    Serial.printf("\t\taveraging in claw %0.1f\n", servo_pos_claw_target);
     servo_pos_claw_actual = (servo_pos_claw_actual * AVERAGE) + (servo_pos_claw_target * (1 - AVERAGE));
 
     // Serial.print("New actual rotation: ");
@@ -242,6 +248,7 @@ void loop(void)
     // Write the actual servo positions to the hardware
     servo_rotation.write(servo_pos_rotation_actual);
     servo_shoulder.write(servo_pos_shoulder_actual);
+    Serial.printf("\t\t\t\twriting claw %0.1f\n", servo_pos_claw_actual);
     servo_claw.write(servo_pos_claw_actual);
     
 
