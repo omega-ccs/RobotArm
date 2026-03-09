@@ -25,11 +25,25 @@ function robotarm() {
         console.log(event.gamepad.id)
     }, false);
 
-    ws = new WebSocket(`ws://${robotarm_hostname}/ws`)
+    initWebSocket()
 
     // Run the main loop
     draw();
 }
+function initWebSocket() {
+    ws = new WebSocket(`ws://${robotarm_hostname}/ws`)
+    ws.onopen    = onOpen;
+    ws.onclose   = onClose;
+     
+}
+  function onOpen(event) {
+    console.log('Connection opened');
+  }
+  function onClose(event) {
+    console.log('Connection closed');
+    setTimeout(initWebSocket, 10);
+  }
+
 
 var robotarm_hostname = "robotarm.local"
 //var robotarm_hostname = "10.0.128.97"
