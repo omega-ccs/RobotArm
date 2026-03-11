@@ -141,19 +141,10 @@ void on_websocket_event(AsyncWebSocket *server,
 
 void setup(void)
 {
+  int retval;
+
   // Set up the serial port for debugging
   Serial.begin(115200);
-
-  ESP32PWM::allocateTimer(0);
-  ESP32PWM::allocateTimer(1);
-  ESP32PWM::allocateTimer(2);
-  ESP32PWM::allocateTimer(3);
-
-  // Set up the servo objects with the appropriate pins
-  servo_rotation.attach(SERVO_PIN_ROTATION);
-  servo_shoulder.attach(SERVO_PIN_SHOULDER);
-  servo_wrist.attach(SERVO_PIN_WRIST);
-  servo_claw.attach(SERVO_PIN_CLAW);
 
   // Start up the WiFi
   setup_wifi();
@@ -169,6 +160,21 @@ void setup(void)
     //      delay(500);
     //    }
   }
+  
+//  ESP32PWM::allocateTimer(0);
+//  ESP32PWM::allocateTimer(1);
+//  ESP32PWM::allocateTimer(2);
+//  ESP32PWM::allocateTimer(3);
+
+  // Set up the servo objects with the appropriate pins
+  retval = servo_rotation.attach(SERVO_PIN_ROTATION);
+  Serial.printf("Attach rotation servo got %d\n",retval);
+  retval = servo_shoulder.attach(SERVO_PIN_SHOULDER);
+  Serial.printf("Attach shoulder servo got %d\n",retval);
+  retval = servo_wrist.attach(SERVO_PIN_WRIST);
+  Serial.printf("Attach wrist servo got %d\n",retval);
+  retval = servo_claw.attach(SERVO_PIN_CLAW);
+  Serial.printf("Attach claw servo got %d\n",retval);
 
   // Set up default headers to resolve CORS access issues
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
@@ -229,7 +235,17 @@ void setup(void)
 
 #define AVERAGE 0.95
 
-void loop(void)
+int servo_dummy = 0;
+void loop() {
+  servo_rotation.write(0);
+  servo_shoulder.write(60);
+  servo_wrist.write(120);
+  servo_claw.write(180);
+  servo_dummy += 1;
+  if (servo_dummy > 180) servo_dummy = 0;
+}
+
+void loop_bad(void)
 {
   // If 10 milliseconds has elapsed since the last action, do the action
   if (millis() >= (last_servo_update + 10))
@@ -237,7 +253,7 @@ void loop(void)
     // Calculate rolling average for the servo positions
     servo_pos_rotation_actual = (servo_pos_rotation_actual * AVERAGE) + (servo_pos_rotation_target * (1 - AVERAGE));
     servo_pos_shoulder_actual = (servo_pos_shoulder_actual * AVERAGE) + (servo_pos_shoulder_target * (1 - AVERAGE));
-    Serial.printf("\t\taveraging in claw %0.1f\n", servo_pos_claw_target);
+//    Serial.printf("\t\taveraging in claw %0.1f\n", servo_pos_claw_target);
     servo_pos_claw_actual = (servo_pos_claw_actual * AVERAGE) + (servo_pos_claw_target * (1 - AVERAGE));
 
     // Serial.print("New actual rotation: ");
@@ -248,7 +264,7 @@ void loop(void)
     // Write the actual servo positions to the hardware
     servo_rotation.write(servo_pos_rotation_actual);
     servo_shoulder.write(servo_pos_shoulder_actual);
-    Serial.printf("\t\t\t\twriting claw %0.1f\n", servo_pos_claw_actual);
+//    Serial.printf("\t\t\t\twriting claw %0.1f\n", servo_pos_claw_actual);
     servo_claw.write(servo_pos_claw_actual);
     
 
