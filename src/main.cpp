@@ -6,6 +6,13 @@
 #include <ArduinoJson.h>
 #include <LittleFS.h>
 
+#include <ESP32_ISR_Servo.h>
+
+#define USE_ESP32_TIMER_NO          3
+#define MIN_MICROS      800  //544
+#define MAX_MICROS      2450
+
+/*
 #ifdef ESP32
 // Include the ESP32 servo library and use the right pins
 #include <ESP32Servo.h>
@@ -17,18 +24,25 @@
 #else
 // Otherwise include the regular Arduino servo library, use those pins
 #include <Servo.h>
+*/
 // 2,3,4,5
-#define SERVO_PIN_ROTATION 2
-#define SERVO_PIN_SHOULDER 3
-#define SERVO_PIN_WRIST 4
-#define SERVO_PIN_CLAW 5
-#endif
+#define SERVO_PIN_ROTATION PIN_D2
+#define SERVO_PIN_SHOULDER PIN_D3
+#define SERVO_PIN_WRIST PIN_D4
+#define SERVO_PIN_CLAW PIN_D5
+//#endif
 
 // Servo objects for each axis
+/*
 Servo servo_rotation;
 Servo servo_shoulder;
 Servo servo_wrist;
 Servo servo_claw;
+*/
+int servo_rotation;
+int servo_shoulder;
+int servo_wrist;
+int servo_claw;
 
 // Intended position for each servo
 float servo_pos_rotation_target = 90;
@@ -44,7 +58,7 @@ float servo_pos_claw_actual = 90;
 
 // Timestamp (milliseconds) of last output event
 uint last_servo_update;
-uint last_mdns_update;
+int adj = 1;
 
 // The webserver that handles all the network connections
 AsyncWebServer server(80);
@@ -166,15 +180,26 @@ void setup(void)
 //  ESP32PWM::allocateTimer(2);
 //  ESP32PWM::allocateTimer(3);
 
+/*
   // Set up the servo objects with the appropriate pins
   retval = servo_rotation.attach(SERVO_PIN_ROTATION);
-  Serial.printf("Attach rotation servo got %d\n",retval);
   retval = servo_shoulder.attach(SERVO_PIN_SHOULDER);
-  Serial.printf("Attach shoulder servo got %d\n",retval);
   retval = servo_wrist.attach(SERVO_PIN_WRIST);
-  Serial.printf("Attach wrist servo got %d\n",retval);
   retval = servo_claw.attach(SERVO_PIN_CLAW);
-  Serial.printf("Attach claw servo got %d\n",retval);
+*/
+
+  //Select ESP32 timer USE_ESP32_TIMER_NO
+	ESP32_ISR_Servos.useTimer(USE_ESP32_TIMER_NO);
+
+	servo_rotation = ESP32_ISR_Servos.setupServo(2, MIN_MICROS, MAX_MICROS);
+	servo_shoulder = ESP32_ISR_Servos.setupServo(3, MIN_MICROS, MAX_MICROS);
+	servo_wrist = ESP32_ISR_Servos.setupServo(4, MIN_MICROS, MAX_MICROS);
+	servo_claw = ESP32_ISR_Servos.setupServo(5, MIN_MICROS, MAX_MICROS);
+
+  Serial.printf("Attach rotation servo got %d\n",servo_rotation);
+  Serial.printf("Attach shoulder servo got %d\n",servo_shoulder);
+  Serial.printf("Attach wrist servo got %d\n",servo_wrist);
+  Serial.printf("Attach claw servo got %d\n",servo_claw);
 
   // Set up default headers to resolve CORS access issues
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
@@ -230,50 +255,40 @@ void setup(void)
 
   // Prime the action timer with the current time
   last_servo_update = millis();
-  last_mdns_update = millis();
 }
 
-#define AVERAGE 0.95
 
-int servo_dummy = 0;
-void loop() {
-  servo_rotation.write(0);
-  servo_shoulder.write(60);
-  servo_wrist.write(120);
-  servo_claw.write(180);
-  servo_dummy += 1;
-  if (servo_dummy > 180) servo_dummy = 0;
-}
-
-void loop_bad(void)
+void loop(void)
 {
   // If 10 milliseconds has elapsed since the last action, do the action
   if (millis() >= (last_servo_update + 10))
   {
     // Calculate rolling average for the servo positions
-    servo_pos_rotation_actual = (servo_pos_rotation_actual * AVERAGE) + (servo_pos_rotation_target * (1 - AVERAGE));
-    servo_pos_shoulder_actual = (servo_pos_shoulder_actual * AVERAGE) + (servo_pos_shoulder_target * (1 - AVERAGE));
+//    servo_pos_rotation_actual = (servo_pos_rotation_actual * AVERAGE) + (servo_pos_rotation_target * (1 - AVERAGE));
+//    servo_pos_shoulder_actual = (servo_pos_shoulder_actual * AVERAGE) + (servo_pos_shoulder_target * (1 - AVERAGE));
 //    Serial.printf("\t\taveraging in claw %0.1f\n", servo_pos_claw_target);
-    servo_pos_claw_actual = (servo_pos_claw_actual * AVERAGE) + (servo_pos_claw_target * (1 - AVERAGE));
+//    servo_pos_claw_actual = (servo_pos_claw_actual * AVERAGE) + (servo_pos_claw_target * (1 - AVERAGE));
 
     // Serial.print("New actual rotation: ");
     // Serial.print(servo_pos_rotation_actual);
     // Serial.print("  shoulder: ");
     // Serial.println(servo_pos_shoulder_actual);
 
+    servo_pos_rotation_actual += adj;
+    if ((servo_pos_rotation_actual < 0) || (servo_pos_rotation_actual >= 180)) adj *= -1; 
+
     // Write the actual servo positions to the hardware
-    servo_rotation.write(servo_pos_rotation_actual);
-    servo_shoulder.write(servo_pos_shoulder_actual);
+    ESP32_ISR_Servos.setPosition(servo_rotation,servo_pos_rotation_actual);
+    ESP32_ISR_Servos.setPosition(servo_shoulder,servo_pos_shoulder_actual);
+    ESP32_ISR_Servos.setPosition(servo_wrist,servo_pos_wrist_actual);
+    ESP32_ISR_Servos.setPosition(servo_claw,servo_pos_claw_actual);
+//    servo_rotation.write(servo_pos_rotation_actual);
+//    servo_shoulder.write(servo_pos_shoulder_actual);
 //    Serial.printf("\t\t\t\twriting claw %0.1f\n", servo_pos_claw_actual);
-    servo_claw.write(servo_pos_claw_actual);
+//    servo_claw.write(servo_pos_claw_actual);
     
 
     // Update the last action timer to the current time
     last_servo_update = millis();
-  }
-  if (millis() >= (last_mdns_update + 5000))
-  {
-    // This doesn't actually seem to exist, so ....?
-    // MDNS.update()
   }
 }
